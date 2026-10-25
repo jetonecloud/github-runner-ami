@@ -1,0 +1,106 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  packer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-packer@v3
+        with:
+          version: "1.11.*"
+
+      - name: packer fmt -check
+        run: packer fmt -check -recursive packer/
+
+      - name: packer init
+        run: packer init packer/
+
+      - name: packer validate (x86_64)
+        run: packer validate -var-file=packer/x86_64.pkrvars.hcl packer/
+
+      - name: packer validate (arm64)
+        run: packer validate -var-file=packer/arm64.pkrvars.hcl packer/
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        run: |
+          shellcheck --severity=warning \
+            packer/scripts/*.sh \
+            packer/files/scripts/*.sh \
+            ansible/roles/*/files/*.sh \
+            test/smoke-test.sh
+
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.*"
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive terraform/
+
+      - name: terraform validate (module)
+        working-directory: terraform/modules/github-runner-asg
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: terraform validate (example)
+        working-directory: terraform/examples/basic
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+  ansible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ansible + ansible-lint
+        run: pip install --disable-pip-version-check ansible ansible-lint
+
+      - name: ansible-playbook --syntax-check
+        working-directory: ansible
+        run: ansible-playbook --syntax-check playbook.yml
+
+      - name: ansible-lint
+        working-directory: ansible
+        run: ansible-lint playbook.yml
+
+  yaml-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install yamllint
+        run: pip install --disable-pip-version-check yamllint
+
+      - name: yamllint
+        run: |
+          yamllint -d "{extends: default, rules: {line-length: disable, document-start: disable}}" \
+            .github/workflows ansible/playbook.yml ansible/group_vars test/sample-workflow.yml
