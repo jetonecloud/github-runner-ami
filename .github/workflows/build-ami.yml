@@ -1,0 +1,189 @@
+name: Build AMI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packer/**"
+      - "ansible/**"
+      - ".github/workflows/build-ami.yml"
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: Architecture to build
+        type: choice
+        options: [both, x86_64, arm64]
+        default: both
+      skip_smoke_test:
+        description: Skip the live smoke test job
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      arch:
+        type: string
+        default: both
+      skip_smoke_test:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      arch: ${{ steps.set.outputs.arch }}
+    steps:
+      - id: set
+        run: |
+          case "${{ inputs.arch || 'both' }}" in
+            both)    echo 'arch=["x86_64","arm64"]' >> "$GITHUB_OUTPUT" ;;
+            x86_64)  echo 'arch=["x86_64"]'          >> "$GITHUB_OUTPUT" ;;
+            arm64)   echo 'arch=["arm64"]'            >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  build:
+    needs: matrix
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(needs.matrix.outputs.arch) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-packer@v3
+        with:
+          version: "1.11.*"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_BUILD_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Compute AMI version
+        id: version
+        run: echo "ami_version=$(date -u +%Y.%m.%d)-$(echo "${{ github.sha }}" | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - name: packer init
+        run: packer init packer/
+
+      # This single build runs every provisioning script including
+      # 95-trivy-scan.sh, which fails the build outright on HIGH/CRITICAL
+      # findings - that's the Trivy scan gate for this pipeline.
+      - name: packer build (${{ matrix.arch }})
+        run: |
+          packer build \
+            -var-file=packer/${{ matrix.arch }}.pkrvars.hcl \
+            -var "ami_version=${{ steps.version.outputs.ami_version }}" \
+            -var "aws_region=${{ env.AWS_REGION }}" \
+            packer/
+
+      - name: Extract AMI ID from manifest
+        id: ami
+        run: |
+          ami_id=$(jq -r '.builds[-1].artifact_id' packer/manifest.json | cut -d: -f2)
+          echo "ami_id=${ami_id}" >> "$GITHUB_OUTPUT"
+          echo "Built ${{ matrix.arch }} AMI: ${ami_id}"
+
+      - name: Record AMI metadata artifact
+        run: |
+          jq -n \
+            --arg arch "${{ matrix.arch }}" \
+            --arg ami_id "${{ steps.ami.outputs.ami_id }}" \
+            --arg ami_version "${{ steps.version.outputs.ami_version }}" \
+            --arg sha "${{ github.sha }}" \
+            '{arch: $arch, ami_id: $ami_id, ami_version: $ami_version, git_sha: $sha}' \
+            > "ami-${{ matrix.arch }}.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ami-${{ matrix.arch }}
+          path: ami-${{ matrix.arch }}.json
+          retention-days: 90
+
+  smoke-test:
+    needs: [matrix, build]
+    if: ${{ !inputs.skip_smoke_test }}
+    runs-on: ubuntu-latest
+    environment: smoke-test
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(needs.matrix.outputs.arch) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ami-${{ matrix.arch }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_SMOKE_TEST_ROLE_ARN || vars.AWS_BUILD_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run smoke test
+        env:
+          GITHUB_TOKEN: ${{ secrets.SMOKE_TEST_GITHUB_TOKEN }}
+          TEST_REPO: ${{ vars.SMOKE_TEST_REPO }}
+          SUBNET_ID: ${{ vars.SMOKE_TEST_SUBNET_ID }}
+          SECURITY_GROUP_ID: ${{ vars.SMOKE_TEST_SECURITY_GROUP_ID }}
+          INSTANCE_PROFILE_NAME: ${{ vars.SMOKE_TEST_INSTANCE_PROFILE_NAME }}
+          INSTANCE_TYPE: ${{ matrix.arch == 'arm64' && 't4g.medium' || 't3.medium' }}
+        run: |
+          export AMI_ID="$(jq -r .ami_id "ami-${{ matrix.arch }}.json")"
+          ./test/smoke-test.sh
+
+  publish:
+    needs: [matrix, build, smoke-test]
+    if: ${{ always() && github.ref == 'refs/heads/main' && needs.build.result == 'success' && (needs.smoke-test.result == 'success' || needs.smoke-test.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        arch: ${{ fromJSON(needs.matrix.outputs.arch) }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ami-${{ matrix.arch }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_BUILD_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Tag AMI and publish "latest" SSM pointer
+        run: |
+          ami_id="$(jq -r .ami_id "ami-${{ matrix.arch }}.json")"
+          ami_version="$(jq -r .ami_version "ami-${{ matrix.arch }}.json")"
+
+          aws ec2 create-tags --resources "${ami_id}" --tags \
+            "Key=Published,Value=true" \
+            "Key=GithubRunId,Value=${{ github.run_id }}" \
+            "Key=GithubSha,Value=${{ github.sha }}"
+
+          aws ssm put-parameter \
+            --name "/github-runner-ami/latest/${{ matrix.arch }}" \
+            --type String \
+            --overwrite \
+            --value "${ami_id}"
+
+          echo "Published ${{ matrix.arch }} AMI ${ami_id} (version ${ami_version})"
