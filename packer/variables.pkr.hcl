@@ -179,6 +179,27 @@ variable "go_checksum_arm64" {
 }
 
 #
+# Docker buildx CLI plugin
+#
+variable "buildx_version" {
+  type        = string
+  description = "docker/buildx release version to install (without leading v)."
+  default     = "0.38.1"
+}
+
+variable "buildx_checksum_amd64" {
+  type        = string
+  description = "SHA-256 of buildx-v<buildx_version>.linux-amd64, from the GitHub release asset digest."
+  default     = "e25d5cd675092bb5d1d03632fdc46cdf3fede7b514dc5f023a105e00d3ce5ad4"
+}
+
+variable "buildx_checksum_arm64" {
+  type        = string
+  description = "SHA-256 of buildx-v<buildx_version>.linux-arm64, from the GitHub release asset digest."
+  default     = "3b83b3731916ba433feccaaa689fe5bcdc81c641d92c8e6c2ea865dfa141c97a"
+}
+
+#
 # Trivy
 #
 variable "trivy_version" {
