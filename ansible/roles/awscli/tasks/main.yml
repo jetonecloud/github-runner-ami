@@ -1,0 +1,14 @@
+---
+# GPG signature verification doesn't map cleanly onto a declarative Ansible
+# module, so this role runs the same script the shell provisioning path
+# uses (ansible/roles/awscli/files/install-awscli.sh is kept identical to
+# packer/scripts/30-install-awscli.sh).
+- name: Install AWS CLI v2 (GPG-verified)
+  ansible.builtin.script:
+    cmd: install-awscli.sh
+  environment:
+    AWSCLI_VERSION: "{{ awscli_version }}"
+    AWSCLI_ARCH: "{{ awscli_arch }}"
+    AWSCLI_GPG_FINGERPRINT: "{{ awscli_gpg_fingerprint }}"
+  args:
+    creates: /usr/local/bin/aws

@@ -1,0 +1,9 @@
+---
+# Identical to packer/scripts/95-trivy-scan.sh, run right before cleanup so
+# the scan sees the fully-provisioned filesystem. Fails the play (and the
+# Ansible provisioner step in Packer) on HIGH/CRITICAL findings.
+- name: Run Trivy filesystem scan and gate on severity
+  ansible.builtin.script:
+    cmd: trivy-scan.sh
+  environment:
+    TRIVY_FAIL_SEVERITY: "{{ trivy_fail_severity }}"

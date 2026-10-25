@@ -1,0 +1,64 @@
+---
+- name: Clean dnf cache
+  command: dnf clean all
+  changed_when: false
+
+- name: Remove dnf/tmp caches
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/cache/dnf
+    - /tmp
+    - /var/tmp
+
+- name: Recreate /tmp and /var/tmp with correct permissions
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "1777"
+  loop:
+    - /tmp
+    - /var/tmp
+
+- name: Remove static SSH host keys (sshd is disabled; no reason to ship them)
+  shell: rm -f /etc/ssh/ssh_host_*
+  changed_when: false
+
+- name: Reset cloud-init state so every launched instance is a fresh first boot
+  command: cloud-init clean --logs
+  ignore_errors: true
+  changed_when: true
+
+- name: Remove cloud-init instance state
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/lib/cloud/instance
+  ignore_errors: true
+
+- name: Truncate machine-id (systemd regenerates it on first boot)
+  copy:
+    content: ""
+    dest: /etc/machine-id
+    mode: "0444"
+  ignore_errors: true
+
+- name: Remove dbus machine-id
+  file:
+    path: /var/lib/dbus/machine-id
+    state: absent
+
+- name: Truncate log files
+  shell: find /var/log -type f -exec truncate -s 0 {} \;
+  changed_when: false
+
+- name: Remove shell history
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /root/.bash_history
+    - /home/ec2-user/.bash_history
+    - /home/runner/.bash_history
