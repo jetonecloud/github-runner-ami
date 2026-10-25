@@ -1,0 +1,66 @@
+# Commit this file to the TEST_REPO used by test/smoke-test.sh, at
+# .github/workflows/sample-workflow.yml (GitHub can only dispatch workflows
+# that already exist on the target branch). It exercises every tool baked
+# into the AMI and must complete with conclusion "success" for the smoke
+# test to pass.
+name: AMI smoke test
+
+run-name: "smoke-test: ${{ inputs.run_marker }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_marker:
+        description: Unique marker injected by test/smoke-test.sh to find this run
+        required: true
+        type: string
+
+jobs:
+  verify-toolchain:
+    runs-on: [self-hosted, linux, ephemeral, smoke-test]
+    timeout-minutes: 10
+    steps:
+      - name: Print marker
+        run: echo "run_marker=${{ inputs.run_marker }}"
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: git
+        run: git --version
+
+      - name: Docker
+        run: |
+          docker --version
+          docker buildx version
+          docker run --rm hello-world
+
+      - name: AWS CLI v2
+        run: aws --version
+
+      - name: Node.js LTS
+        run: |
+          node --version
+          npm --version
+
+      - name: Python 3
+        run: python3 --version
+
+      - name: Go
+        run: /usr/local/go/bin/go version
+
+      - name: jq / unzip
+        run: |
+          jq --version
+          unzip -v | head -n1
+
+      - name: Trivy
+        run: trivy --version
+
+      - name: IMDSv2 is enforced
+        run: |
+          if curl -sf -m 2 http://169.254.169.254/latest/meta-data/instance-id >/dev/null; then
+            echo "IMDSv1 (token-less) request unexpectedly succeeded" >&2
+            exit 1
+          fi
+          echo "IMDSv1 request correctly rejected without a token"
