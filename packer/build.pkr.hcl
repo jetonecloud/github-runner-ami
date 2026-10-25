@@ -12,6 +12,7 @@ locals {
   node_checksum   = var.arch == "arm64" ? var.node_checksum_arm64 : var.node_checksum_x64
   runner_checksum = var.arch == "arm64" ? var.runner_checksum_arm64 : var.runner_checksum_x64
   trivy_checksum  = var.arch == "arm64" ? var.trivy_checksum_arm64 : var.trivy_checksum_x64
+  buildx_checksum = var.arch == "arm64" ? var.buildx_checksum_arm64 : var.buildx_checksum_amd64
 
   provision_env = [
     "ARCH=${var.arch}",
@@ -28,6 +29,8 @@ locals {
     "RUNNER_CHECKSUM=${local.runner_checksum}",
     "TRIVY_VERSION=${var.trivy_version}",
     "TRIVY_CHECKSUM=${local.trivy_checksum}",
+    "BUILDX_VERSION=${var.buildx_version}",
+    "BUILDX_CHECKSUM=${local.buildx_checksum}",
     "TRIVY_FAIL_SEVERITY=${var.trivy_fail_severity}",
     "AWSCLI_VERSION=${var.awscli_version}",
     "AWSCLI_GPG_FINGERPRINT=${var.awscli_gpg_fingerprint}",
