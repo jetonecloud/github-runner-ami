@@ -30,7 +30,7 @@ Clone the repo and run the local validation suite before opening a PR:
 ```bash
 # Format & validate Packer
 packer fmt -check -recursive packer/
-packer validate -var-file=packer/x86_64.auto.pkrvars.hcl packer/
+packer validate -var-file=packer/x86_64.pkrvars.hcl packer/
 
 # Lint shell scripts
 shellcheck packer/scripts/*.sh packer/files/scripts/*.sh test/smoke-test.sh
