@@ -1,0 +1,22 @@
+---
+# Equivalent to the shell provisioners under packer/scripts/, for teams that
+# standardize on Ansible. See ansible/README.md for how to point Packer at
+# this playbook instead of the shell scripts. Keep role ordering identical
+# to the numbered shell scripts so both paths produce the same image.
+- name: Build ephemeral GitHub Actions runner AMI
+  hosts: all
+  become: true
+  gather_facts: true
+
+  roles:
+    - common
+    - docker
+    - awscli
+    - node
+    - python
+    - go
+    - trivy
+    - github_runner
+    - security
+    - trivy_scan
+    - cleanup

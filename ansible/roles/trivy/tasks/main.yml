@@ -1,0 +1,31 @@
+---
+- name: Download Trivy tarball (checksum-verified)
+  get_url:
+    url: "https://github.com/aquasecurity/trivy/releases/download/v{{ trivy_version }}/trivy_{{ trivy_version }}_Linux-{{ trivy_arch }}.tar.gz"
+    dest: "/tmp/trivy_{{ trivy_version }}_Linux-{{ trivy_arch }}.tar.gz"
+    checksum: "sha256:{{ trivy_checksum }}"
+    mode: "0644"
+
+- name: Extract trivy binary
+  unarchive:
+    src: "/tmp/trivy_{{ trivy_version }}_Linux-{{ trivy_arch }}.tar.gz"
+    dest: /tmp
+    remote_src: true
+    include:
+      - trivy
+
+- name: Install trivy binary
+  copy:
+    src: /tmp/trivy
+    dest: /usr/local/bin/trivy
+    remote_src: true
+    mode: "0755"
+
+- name: Remove downloaded tarball
+  file:
+    path: "/tmp/trivy_{{ trivy_version }}_Linux-{{ trivy_arch }}.tar.gz"
+    state: absent
+
+- name: Verify trivy is installed
+  command: trivy --version
+  changed_when: false

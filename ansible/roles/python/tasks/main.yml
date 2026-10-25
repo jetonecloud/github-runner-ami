@@ -1,0 +1,21 @@
+---
+- name: Install Python 3 and tooling
+  dnf:
+    name:
+      - python3
+      - python3-pip
+      - python3-setuptools
+      - python3-virtualenv
+    state: present
+
+- name: Upgrade pip
+  pip:
+    name: pip
+    state: latest
+    executable: pip3
+
+- name: Symlink python -> python3
+  file:
+    src: /usr/bin/python3
+    dest: /usr/local/bin/python
+    state: link

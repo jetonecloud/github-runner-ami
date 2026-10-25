@@ -1,0 +1,46 @@
+---
+- name: Update all packages
+  dnf:
+    name: "*"
+    state: latest
+    update_cache: true
+
+- name: Install base packages
+  dnf:
+    name:
+      - git
+      - jq
+      - unzip
+      - tar
+      - gzip
+      - which
+      - shadow-utils
+      - util-linux
+      - chrony
+      - amazon-ssm-agent
+      - findutils
+      - procps-ng
+      - dnf-plugins-core
+      - gnupg2
+    state: present
+
+- name: Enable chronyd and amazon-ssm-agent
+  systemd:
+    name: "{{ item }}"
+    enabled: true
+  loop:
+    - chronyd
+    - amazon-ssm-agent
+
+- name: Create unprivileged runner system user
+  user:
+    name: runner
+    system: true
+    create_home: true
+    home: /home/runner
+    shell: /sbin/nologin
+    state: present
+
+- name: Clean dnf cache
+  command: dnf clean all
+  changed_when: false

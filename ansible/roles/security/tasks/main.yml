@@ -1,0 +1,33 @@
+---
+# No SSH, SSM Session Manager only. IMDSv2 enforcement is set at the EC2
+# attribute level (packer/sources.pkr.hcl / the Terraform launch template),
+# not here.
+- name: Disable sshd (SSM Session Manager is the only remote access path)
+  systemd:
+    name: sshd.service
+    enabled: false
+  ignore_errors: true
+
+- name: Harden sshd_config defensively (in case sshd is ever re-enabled)
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - { regexp: "^#?PermitRootLogin.*", line: "PermitRootLogin no" }
+    - { regexp: "^#?PasswordAuthentication.*", line: "PasswordAuthentication no" }
+    - { regexp: "^#?X11Forwarding.*", line: "X11Forwarding no" }
+    - { regexp: "^#?AllowTcpForwarding.*", line: "AllowTcpForwarding no" }
+
+- name: Ensure amazon-ssm-agent is enabled
+  systemd:
+    name: amazon-ssm-agent
+    enabled: true
+
+- name: Lock down runner home and install directories
+  file:
+    path: "{{ item }}"
+    mode: "0750"
+  loop:
+    - /home/runner
+    - /opt/actions-runner

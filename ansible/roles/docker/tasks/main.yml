@@ -1,0 +1,49 @@
+---
+- name: Install Docker Engine
+  dnf:
+    name: docker
+    state: present
+
+- name: Enable Docker service
+  systemd:
+    name: docker
+    enabled: true
+
+- name: Create Docker CLI plugins directory
+  file:
+    path: /usr/libexec/docker/cli-plugins
+    state: directory
+    mode: "0755"
+
+- name: Download docker-buildx plugin
+  get_url:
+    url: "https://github.com/docker/buildx/releases/download/v{{ buildx_version }}/buildx-v{{ buildx_version }}.linux-{{ go_arch }}"
+    dest: "/usr/libexec/docker/cli-plugins/docker-buildx"
+    checksum: "sha256:{{ buildx_checksum }}"
+    mode: "0755"
+
+- name: Ensure docker group exists
+  group:
+    name: docker
+    state: present
+
+- name: Add runner user to docker group
+  user:
+    name: runner
+    groups: docker
+    append: true
+
+- name: Add ec2-user to docker group
+  user:
+    name: ec2-user
+    groups: docker
+    append: true
+  ignore_errors: true
+
+- name: Install Docker daemon.json
+  copy:
+    src: daemon.json
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"

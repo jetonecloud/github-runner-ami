@@ -1,0 +1,24 @@
+---
+- name: Download Node.js LTS tarball (checksum-verified)
+  get_url:
+    url: "https://nodejs.org/dist/v{{ node_version }}/node-v{{ node_version }}-linux-{{ node_arch }}.tar.xz"
+    dest: "/tmp/node-v{{ node_version }}-linux-{{ node_arch }}.tar.xz"
+    checksum: "sha256:{{ node_checksum }}"
+    mode: "0644"
+
+- name: Extract Node.js into /usr/local
+  unarchive:
+    src: "/tmp/node-v{{ node_version }}-linux-{{ node_arch }}.tar.xz"
+    dest: /usr/local
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+
+- name: Remove downloaded tarball
+  file:
+    path: "/tmp/node-v{{ node_version }}-linux-{{ node_arch }}.tar.xz"
+    state: absent
+
+- name: Verify node is on PATH
+  command: node --version
+  changed_when: false
