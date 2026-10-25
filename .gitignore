@@ -1,0 +1,42 @@
+# Packer
+packer_cache/
+*.pkrvars.hcl.local
+crash.log
+manifest.json
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+.terraform.lock.hcl
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ansible
+*.retry
+.ansible/
+
+# Secrets / local env
+*.pem
+*.key
+.env
+.env.*
+!*.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Logs and temp
+*.log
+tmp/
+.cache/
