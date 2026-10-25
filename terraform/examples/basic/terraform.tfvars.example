@@ -1,0 +1,29 @@
+# Copy to terraform.tfvars and fill in your own values. Never commit the
+# real terraform.tfvars (it's gitignored) - it typically contains account-
+# specific resource identifiers.
+
+aws_region = "us-east-1"
+name       = "github-runner"
+environment = "ci"
+
+vpc_id = "vpc-0123456789abcdef0"
+
+# Build this with: packer build -var-file=packer/x86_64.pkrvars.hcl packer/
+ami_id        = "ami-0123456789abcdef0"
+instance_type = "m6i.large"
+
+min_size         = 0
+max_size         = 10
+desired_capacity = 0
+
+github_url    = "https://github.com/your-org/your-repo"
+runner_labels = "self-hosted,linux,x64,ephemeral"
+
+# A webhook/Lambda refreshes this parameter with a short-lived registration
+# token (see docs/architecture.md#scale-out-guidance). For the JIT-config
+# pattern instead, set use_jit_config = true and point this at a
+# {instance_id}-templated path, e.g. /github-runner/jit/{instance_id}, with
+# token_parameter_arn as a wildcard: arn:aws:ssm:...:parameter/github-runner/jit/*
+token_parameter_name = "/github-runner/prod/registration-token"
+token_parameter_arn  = "arn:aws:ssm:us-east-1:123456789012:parameter/github-runner/prod/registration-token"
+use_jit_config        = false
