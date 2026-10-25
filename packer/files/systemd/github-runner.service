@@ -1,0 +1,37 @@
+[Unit]
+Description=Ephemeral GitHub Actions runner (one job, then terminate)
+Documentation=https://github.com/jetonecloud/github-runner-ami
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+ConditionPathExists=/etc/github-runner/runner.env
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/github-runner/runner.env
+User=runner
+SupplementaryGroups=docker
+WorkingDirectory=/opt/actions-runner
+TimeoutStartSec=300
+
+# Fetch the JIT/registration credential from SSM Parameter Store or Secrets
+# Manager and register with --ephemeral. Runs as the unprivileged `runner`
+# user, same as ExecStart (the GitHub Actions runner refuses to run
+# config.sh and run.sh as different users).
+ExecStartPre=/opt/github-runner/bin/runner-register.sh
+
+# run.sh exits on its own after exactly one job because the runner was
+# configured with --ephemeral (or started with a single-use --jitconfig).
+ExecStart=/opt/github-runner/bin/runner-start.sh
+
+# Runs as root (the "+" prefix overrides User=) regardless of how the main
+# process exited, so the workspace/Docker state are always wiped and the
+# instance always terminates - including when registration itself failed.
+ExecStopPost=+/opt/github-runner/bin/runner-cleanup.sh
+
+Restart=no
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=github-runner
+
+[Install]
+WantedBy=multi-user.target
