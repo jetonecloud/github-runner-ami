@@ -1,6 +1,6 @@
 ---
 - name: Create /opt/actions-runner owned by runner
-  file:
+  ansible.builtin.file:
     path: /opt/actions-runner
     state: directory
     owner: runner
@@ -8,36 +8,36 @@
     mode: "0755"
 
 - name: Download GitHub Actions runner tarball (checksum-verified)
-  get_url:
+  ansible.builtin.get_url:
     url: "https://github.com/actions/runner/releases/download/v{{ runner_version }}/actions-runner-linux-{{ runner_arch }}-{{ runner_version }}.tar.gz"
     dest: "/tmp/actions-runner-linux-{{ runner_arch }}-{{ runner_version }}.tar.gz"
     checksum: "sha256:{{ runner_checksum }}"
     mode: "0644"
 
 - name: Extract runner into /opt/actions-runner
-  unarchive:
+  ansible.builtin.unarchive:
     src: "/tmp/actions-runner-linux-{{ runner_arch }}-{{ runner_version }}.tar.gz"
     dest: /opt/actions-runner
     remote_src: true
 
 - name: Remove downloaded tarball
-  file:
+  ansible.builtin.file:
     path: "/tmp/actions-runner-linux-{{ runner_arch }}-{{ runner_version }}.tar.gz"
     state: absent
 
 - name: Own the runner install by the runner user
-  file:
+  ansible.builtin.file:
     path: /opt/actions-runner
     owner: runner
     group: runner
     recurse: true
 
 - name: Install native runner dependencies
-  command: /opt/actions-runner/bin/installdependencies.sh
+  ansible.builtin.command: /opt/actions-runner/bin/installdependencies.sh
   changed_when: true
 
 - name: Create ephemeral work directory
-  file:
+  ansible.builtin.file:
     path: /opt/actions-runner/_work
     state: directory
     owner: runner
@@ -45,13 +45,13 @@
     mode: "0750"
 
 - name: Create /opt/github-runner/bin for lifecycle scripts
-  file:
+  ansible.builtin.file:
     path: /opt/github-runner/bin
     state: directory
     mode: "0755"
 
 - name: Install runner lifecycle scripts
-  copy:
+  ansible.builtin.copy:
     src: "{{ item }}"
     dest: "/opt/github-runner/bin/{{ item }}"
     mode: "0755"
@@ -62,19 +62,19 @@
     - fetch-runner-token.sh
 
 - name: Create /etc/github-runner (runner.env is written by Terraform user_data at boot)
-  file:
+  ansible.builtin.file:
     path: /etc/github-runner
     state: directory
     mode: "0755"
 
 - name: Install github-runner systemd unit
-  copy:
+  ansible.builtin.copy:
     src: github-runner.service
     dest: /etc/systemd/system/github-runner.service
     mode: "0644"
 
 - name: Reload systemd
-  systemd:
+  ansible.builtin.systemd:
     daemon_reload: true
 
 # Intentionally not enabled here - see packer/scripts/85-install-runner-service.sh

@@ -1,34 +1,34 @@
 ---
 - name: Download Go toolchain tarball (checksum-verified)
-  get_url:
+  ansible.builtin.get_url:
     url: "https://go.dev/dl/go{{ go_version }}.linux-{{ go_arch }}.tar.gz"
     dest: "/tmp/go{{ go_version }}.linux-{{ go_arch }}.tar.gz"
     checksum: "sha256:{{ go_checksum }}"
     mode: "0644"
 
 - name: Remove any previous Go install
-  file:
+  ansible.builtin.file:
     path: /usr/local/go
     state: absent
 
 - name: Extract Go into /usr/local
-  unarchive:
+  ansible.builtin.unarchive:
     src: "/tmp/go{{ go_version }}.linux-{{ go_arch }}.tar.gz"
     dest: /usr/local
     remote_src: true
 
 - name: Remove downloaded tarball
-  file:
+  ansible.builtin.file:
     path: "/tmp/go{{ go_version }}.linux-{{ go_arch }}.tar.gz"
     state: absent
 
 - name: Add Go to PATH for all users
-  copy:
+  ansible.builtin.copy:
     dest: /etc/profile.d/golang.sh
     content: |
       export PATH="$PATH:/usr/local/go/bin"
     mode: "0644"
 
 - name: Verify go is installed
-  command: /usr/local/go/bin/go version
+  ansible.builtin.command: /usr/local/go/bin/go version
   changed_when: false

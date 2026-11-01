@@ -3,13 +3,14 @@
 # attribute level (packer/sources.pkr.hcl / the Terraform launch template),
 # not here.
 - name: Disable sshd (SSM Session Manager is the only remote access path)
-  systemd:
+  ansible.builtin.systemd:
     name: sshd.service
     enabled: false
-  ignore_errors: true
+  # Minimal AL2023 images may not ship sshd at all - nothing to disable then.
+  failed_when: false
 
 - name: Harden sshd_config defensively (in case sshd is ever re-enabled)
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
     regexp: "{{ item.regexp }}"
     line: "{{ item.line }}"
@@ -20,12 +21,12 @@
     - { regexp: "^#?AllowTcpForwarding.*", line: "AllowTcpForwarding no" }
 
 - name: Ensure amazon-ssm-agent is enabled
-  systemd:
+  ansible.builtin.systemd:
     name: amazon-ssm-agent
     enabled: true
 
 - name: Lock down runner home and install directories
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     mode: "0750"
   loop:

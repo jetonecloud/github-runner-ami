@@ -1,12 +1,13 @@
 ---
+# noqa: package-latest - patching every package is the point of the weekly rebuild.
 - name: Update all packages
-  dnf:
+  ansible.builtin.dnf:
     name: "*"
     state: latest
     update_cache: true
 
 - name: Install base packages
-  dnf:
+  ansible.builtin.dnf:
     name:
       - git
       - jq
@@ -25,7 +26,7 @@
     state: present
 
 - name: Enable chronyd and amazon-ssm-agent
-  systemd:
+  ansible.builtin.systemd:
     name: "{{ item }}"
     enabled: true
   loop:
@@ -33,7 +34,7 @@
     - amazon-ssm-agent
 
 - name: Create unprivileged runner system user
-  user:
+  ansible.builtin.user:
     name: runner
     system: true
     create_home: true
@@ -42,5 +43,5 @@
     state: present
 
 - name: Clean dnf cache
-  command: dnf clean all
+  ansible.builtin.command: dnf clean all
   changed_when: false
