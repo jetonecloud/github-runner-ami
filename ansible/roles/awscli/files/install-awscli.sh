@@ -15,7 +15,8 @@ curl -fsSL -o "${zip_name}" "https://awscli.amazonaws.com/${zip_name}"
 curl -fsSL -o "${zip_name}.sig" "https://awscli.amazonaws.com/${zip_name}.sig"
 
 export GNUPGHOME="${workdir}/gnupg"
-mkdir -m 0700 -p "${GNUPGHOME}"
+mkdir -p "${GNUPGHOME}"
+chmod 0700 "${GNUPGHOME}"
 
 key_imported=0
 for keyserver in hkps://keys.openpgp.org hkps://keyserver.ubuntu.com; do

@@ -39,6 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       arch: ${{ steps.set.outputs.arch }}
+      aws_configured: ${{ steps.aws.outputs.configured }}
     steps:
       - id: set
         run: |
@@ -48,8 +49,23 @@ jobs:
             arm64)   echo 'arch=["arm64"]'            >> "$GITHUB_OUTPUT" ;;
           esac
 
+      # Without an OIDC role there is nothing to authenticate to AWS with, so
+      # skip the AWS-dependent jobs rather than failing on every push in a
+      # fork or a clone that has not been wired up to an account yet.
+      - id: aws
+        env:
+          ROLE_ARN: ${{ vars.AWS_BUILD_ROLE_ARN }}
+        run: |
+          if [ -n "${ROLE_ARN}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::AWS_BUILD_ROLE_ARN is not set - skipping the AMI build. See README.md for the OIDC setup."
+          fi
+
   build:
     needs: matrix
+    if: ${{ needs.matrix.outputs.aws_configured == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -114,7 +130,7 @@ jobs:
 
   smoke-test:
     needs: [matrix, build]
-    if: ${{ !inputs.skip_smoke_test }}
+    if: ${{ needs.matrix.outputs.aws_configured == 'true' && !inputs.skip_smoke_test }}
     runs-on: ubuntu-latest
     environment: smoke-test
     permissions:
