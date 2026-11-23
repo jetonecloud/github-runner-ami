@@ -40,3 +40,6 @@ Thumbs.db
 *.log
 tmp/
 .cache/
+
+CLAUDE.md
+.claude/
